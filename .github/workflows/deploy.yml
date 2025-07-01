@@ -1,0 +1,65 @@
+# Nome da nossa pipeline
+name: Build and Deploy to AWS
+
+# Gatilho: A pipeline vai rodar toda vez que houver um push na branch 'main'
+on:
+  push:
+    branches: [ "main" ]
+
+# Define as variáveis de ambiente que a pipeline usará
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: s3-uploader-app
+  # COLE O ARN DO SEU APP RUNNER AQUI EMBAIXO
+  APP_RUNNER_SERVICE_ARN: arn:aws:apprunner:us-east-1:504759923868:service/s3-uploader-service/b3ce8e44b13c4819ba93d8a52f5417f2
+
+jobs:
+  deploy:
+    name: Build, Push and Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      # 1. Baixa o código do seu repositório para a máquina virtual da pipeline
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Configura as credenciais da AWS de forma segura usando os segredos do GitHub
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 3. Faz o login do Docker no nosso repositório ECR privado
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 4. Constrói a imagem Docker, adiciona uma tag e envia para o ECR
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }} # Usa o ID do commit como uma tag única
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      # 5. ATUALIZA o App Runner para usar a NOSSA imagem
+      # Este passo é a chave: ele troca a imagem de exemplo pela nossa
+      - name: Update App Runner to use new image from ECR
+        run: |
+          aws apprunner update-service \
+            --service-arn ${{ env.APP_RUNNER_SERVICE_ARN }} \
+            --source-configuration '{
+              "AuthenticationConfiguration": {
+                "AccessRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/AppRunnerECRAccessRole-s3-uploader"
+              },
+              "ImageRepository": {
+                "ImageIdentifier": "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}",
+                "ImageRepositoryType": "ECR"
+              }
+            }'
