@@ -10,12 +10,11 @@ terraform {
 
 # Configura o provedor AWS para a região correta
 provider "aws" {
-  # Usamos us-east-1 porque o AWS App Runner está disponível lá.
+  # IMPORTANTE: Usamos us-east-1 porque o AWS App Runner está disponível lá.
   region = "us-east-1"
 }
 
-# 1. Cria a nossa "garagem" PRIVADA para imagens Docker (ECR)
-# Nossa pipeline vai enviar a imagem da nossa aplicação para cá.
+# 1. Cria a nossa "garagem" para imagens Docker (ECR)
 resource "aws_ecr_repository" "app_repo" {
   name                 = "s3-uploader-app"
   image_tag_mutability = "MUTABLE"
@@ -25,9 +24,7 @@ resource "aws_ecr_repository" "app_repo" {
   }
 }
 
-# 2. Cria a permissão para o App Runner poder, no FUTURO, acessar nossa garagem privada
-# Embora a criação inicial use uma imagem pública, esta permissão será
-# essencial para que a pipeline consiga fazer o deploy da nossa imagem privada.
+# 2. Cria a permissão para o App Runner poder acessar a garagem (ECR)
 resource "aws_iam_role" "apprunner_ecr_role" {
   name = "AppRunnerECRAccessRole-s3-uploader"
 
@@ -48,18 +45,19 @@ resource "aws_iam_role_policy_attachment" "apprunner_ecr_policy_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"
 }
 
-# 3. Cria o serviço App Runner usando uma IMAGEM PÚBLICA DE EXEMPLO
+# 3. Cria o serviço App Runner que vai executar nossa aplicação
 resource "aws_apprunner_service" "app_service" {
   service_name = "s3-uploader-service"
 
-  # AQUI ESTÁ A MUDANÇA PRINCIPAL: Usamos uma imagem pública para a criação inicial
   source_configuration {
-    # Não precisamos de autenticação para uma imagem pública
-    image_repository {
-      image_identifier      = "public.ecr.aws/aws-containers/hello-app-runner:latest"
-      image_repository_type = "ECR_PUBLIC" # O tipo muda para ECR PÚBLICO
+    authentication_configuration {
+      access_role_arn = aws_iam_role.apprunner_ecr_role.arn
     }
-    auto_deployments_enabled = false
+    image_repository {
+      image_identifier      = "${aws_ecr_repository.app_repo.repository_url}:latest"
+      image_repository_type = "ECR"
+    }
+    auto_deployments_enabled = true
   }
 
   instance_configuration {
@@ -79,7 +77,7 @@ resource "aws_apprunner_service" "app_service" {
   }
 }
 
-# Bloco de saídas para exportar informações importantes
+# Bloco de saídas para exportar informações importantes da nossa infraestrutura
 output "ecr_repository_url" {
   description = "A URL do repositório ECR criado."
   value       = aws_ecr_repository.app_repo.repository_url
