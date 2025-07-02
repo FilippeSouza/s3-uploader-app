@@ -1,16 +1,3 @@
-# Declaração das variáveis sensíveis
-variable "app_aws_access_key_id" {
-  description = "A chave de acesso para a aplicação rodar"
-  type        = string
-  sensitive   = true
-}
-variable "app_aws_secret_access_key" {
-  description = "A chave secreta para a aplicação rodar"
-  type        = string
-  sensitive   = true
-}
-
-# Configuração do Provedor
 provider "aws" {
   region = "us-east-1"
 }
@@ -21,9 +8,9 @@ resource "aws_ecr_repository" "app_repo" {
   force_delete = true
 }
 /*
-/*# 2. Cria a permissão para o App Runner acessar o ECR
+# 2. Permissão para o App Runner ACESSAR o ECR
 resource "aws_iam_role" "apprunner_ecr_role" {
-  name = "AppRunnerECRAccessRole-s3-uploader"
+  name = "AppRunnerECRAccessRole-s3"
   assume_role_policy = jsonencode({
     Version   = "2012-10-17",
     Statement = [{
@@ -38,7 +25,35 @@ resource "aws_iam_role_policy_attachment" "apprunner_ecr_policy_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"
 }
 
-# 3. Cria o serviço App Runner para a NOSSA aplicação
+# 3. Permissão para a APLICAÇÃO ACESSAR o S3
+resource "aws_iam_role" "apprunner_instance_role" {
+  name = "AppRunnerInstanceRole-s3"
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17",
+    Statement = [{
+      Action    = "sts:AssumeRole",
+      Effect    = "Allow",
+      Principal = { Service = "tasks.apprunner.amazonaws.com" }
+    }]
+  })
+}
+resource "aws_iam_role_policy" "s3_access_policy" {
+  name = "AppRunnerS3AccessPolicy"
+  role = aws_iam_role.apprunner_instance_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Action   = ["s3:GetObject", "s3:PutObject"],
+      Effect   = "Allow",
+      Resource = [
+        "arn:aws:s3:::welcome-ecopower",
+        "arn:aws:s3:::welcome-ecopower/*",
+      ]
+    }]
+  })
+}
+
+# 4. O Serviço App Runner
 resource "aws_apprunner_service" "app_service" {
   service_name = "s3-uploader-service"
 
@@ -49,21 +64,14 @@ resource "aws_apprunner_service" "app_service" {
     image_repository {
       image_identifier      = "${aws_ecr_repository.app_repo.repository_url}:latest"
       image_repository_type = "ECR"
-      image_configuration {
-        runtime_environment_variables = {
-          AWS_ACCESS_KEY_ID     = var.app_aws_access_key_id
-          AWS_SECRET_ACCESS_KEY = var.app_aws_secret_access_key
-          AWS_S3_BUCKET_NAME    = "welcome-ecopower"
-          AWS_REGION            = "us-east-1"
-        }
-      }
     }
     auto_deployments_enabled = true
   }
 
   instance_configuration {
-    cpu    = "1024"
-    memory = "2048"
+    cpu               = "1024"
+    memory            = "2048"
+    instance_role_arn = aws_iam_role.apprunner_instance_role.arn # Associa a permissão de S3 ao serviço
   }
 }
 
