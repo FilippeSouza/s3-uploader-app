@@ -1,6 +1,6 @@
 // 1. Importar os pacotes necessários
 console.log("--- ESTOU EXECUTANDO A VERSÃO MAIS RECENTE DO ARQUIVO ---");
-require('dotenv').config(); // Carrega as variáveis do arquivo .env
+//require('dotenv').config(); // Carrega as variáveis do arquivo .env
 const express = require('express');
 const multer = require('multer');
 const { S3Client } = require('@aws-sdk/client-s3');

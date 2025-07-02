@@ -1,63 +1,44 @@
-# Declaração das variáveis sensíveis que serão passadas pelo terminal
+# Declaração das variáveis sensíveis
 variable "app_aws_access_key_id" {
   description = "A chave de acesso para a aplicação rodar"
   type        = string
   sensitive   = true
 }
-
 variable "app_aws_secret_access_key" {
   description = "A chave secreta para a aplicação rodar"
   type        = string
   sensitive   = true
 }
 
-# Bloco de configuração do Terraform e do provedor AWS
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-# Configura o provedor AWS para a região correta
+# Configuração do Provedor
 provider "aws" {
   region = "us-east-1"
 }
 
-# 1. Cria a nossa "garagem" PRIVADA para imagens Docker (ECR)
+# 1. Cria o repositório ECR
 resource "aws_ecr_repository" "app_repo" {
-  name                 = "s3-uploader-app"
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
+  name         = "s3-uploader-app"
+  force_delete = true
 }
-
-# 2. Cria a permissão para o App Runner poder acessar a garagem (ECR)
+/*
+/*# 2. Cria a permissão para o App Runner acessar o ECR
 resource "aws_iam_role" "apprunner_ecr_role" {
   name = "AppRunnerECRAccessRole-s3-uploader"
-
   assume_role_policy = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [{
       Action    = "sts:AssumeRole",
       Effect    = "Allow",
-      Principal = {
-        Service = "build.apprunner.amazonaws.com"
-      }
+      Principal = { Service = "build.apprunner.amazonaws.com" }
     }]
   })
 }
-
 resource "aws_iam_role_policy_attachment" "apprunner_ecr_policy_attachment" {
   role       = aws_iam_role.apprunner_ecr_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"
 }
 
-# 3. Cria o serviço App Runner que vai executar nossa aplicação
+# 3. Cria o serviço App Runner para a NOSSA aplicação
 resource "aws_apprunner_service" "app_service" {
   service_name = "s3-uploader-service"
 
@@ -68,8 +49,6 @@ resource "aws_apprunner_service" "app_service" {
     image_repository {
       image_identifier      = "${aws_ecr_repository.app_repo.repository_url}:latest"
       image_repository_type = "ECR"
-
-      # ## O LUGAR CORRETO É DENTRO DE UM BLOCO 'image_configuration' ##
       image_configuration {
         runtime_environment_variables = {
           AWS_ACCESS_KEY_ID     = var.app_aws_access_key_id
@@ -86,26 +65,9 @@ resource "aws_apprunner_service" "app_service" {
     cpu    = "1024"
     memory = "2048"
   }
-
-  network_configuration {
-    ingress_configuration {
-      is_publicly_accessible = true
-    }
-  }
-
-  tags = {
-    ManagedBy = "Terraform"
-    Project   = "s3-uploader"
-  }
 }
 
-# Bloco de saídas para exportar informações importantes
-output "ecr_repository_url" {
-  description = "A URL do repositório ECR criado."
-  value       = aws_ecr_repository.app_repo.repository_url
-}
-
+# Saídas
 output "app_runner_service_arn" {
-  description = "O ARN do serviço App Runner criado."
-  value       = aws_apprunner_service.app_service.arn
-}
+  value = aws_apprunner_service.app_service.arn
+}*/

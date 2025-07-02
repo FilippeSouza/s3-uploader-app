@@ -1,31 +1,25 @@
-# Nome da nossa pipeline
-name: Build and Deploy to AWS
+name: Build, Push, and Deploy to AWS
 
-# Gatilho: A pipeline vai rodar toda vez que houver um push na branch 'main'
 on:
   push:
-    branches:
-      - "main"
+    branches: [ "main" ]
 
-# Define as variáveis de ambiente que a pipeline usará
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: s3-uploader-app
-  APP_RUNNER_SERVICE_ARN: ${{ secrets.APP_RUNNER_SERVICE_ARN }} # Vamos usar um segredo para isso também
+  APP_RUNNER_SERVICE_ARN: ${{ secrets.APP_RUNNER_SERVICE_ARN }}
 
 jobs:
   deploy:
-    name: Build, Push and Deploy
+    name: Deploy to AWS
     runs-on: ubuntu-latest
     permissions:
       contents: read
 
     steps:
-      # 1. Baixa o código do seu repositório para a máquina virtual da pipeline
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Configura as credenciais da AWS de forma segura
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -33,27 +27,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 3. PASSO DETETIVE: Verifica a existência do Dockerfile
-      - name: Verify Dockerfile exists
-        run: |
-          echo "Estou no diretorio:"
-          pwd
-          echo "--- Listando arquivos ---"
-          ls -la
-          echo "-------------------------"
-          if [ ! -f Dockerfile ]; then
-            echo "ERRO CRITICO: O arquivo 'Dockerfile' NAO FOI ENCONTRADO AQUI."
-            exit 1
-          fi
-          echo "SUCESSO: O arquivo 'Dockerfile' foi encontrado."
-
-      # 4. Faz o login do Docker no nosso repositório ECR privado
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 5. Constrói a imagem Docker, adiciona uma tag e envia para o ECR
-      - name: Build, tag, and push image to Amazon ECR
+      - name: Build, tag, and push image
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -61,5 +39,8 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
- 
+      - name: Start App Runner deployment
+        run: aws apprunner start-deployment --service-arn ${{ env.APP_RUNNER_SERVICE_ARN }}
