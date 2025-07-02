@@ -42,6 +42,7 @@ Descrição do Fluxo:
 Um dos maiores desafios foi resolver o problema de dependência ("ovo e da galinha") entre a criação da infraestrutura no Terraform e a necessidade de uma imagem Docker no ECR para o App Runner. A solução foi um processo de bootstrapping em múltiplas etapas, criando primeiro os recursos base (ECR) e depois utilizando a pipeline para popular o ECR antes da criação final do serviço App Runner
 
 
+```mermaid
 graph LR
     subgraph "Ambiente de Desenvolvimento"
         A[👨‍💻 Engenheiro DevOps/Cloud]
@@ -60,6 +61,7 @@ graph LR
             S3[🗄️ Bucket S3<br>welcome-ecopower]
             IAM[🔑 Roles e Permissões IAM]
         end
+
         App[⚙️ Aplicação Node.js<br>em execução]
     end
 
