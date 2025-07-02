@@ -1,3 +1,16 @@
+# Declaração das variáveis sensíveis que serão passadas pelo terminal
+variable "app_aws_access_key_id" {
+  description = "A chave de acesso para a aplicação rodar"
+  type        = string
+  sensitive   = true
+}
+
+variable "app_aws_secret_access_key" {
+  description = "A chave secreta para a aplicação rodar"
+  type        = string
+  sensitive   = true
+}
+
 # Bloco de configuração do Terraform e do provedor AWS
 terraform {
   required_providers {
@@ -10,11 +23,10 @@ terraform {
 
 # Configura o provedor AWS para a região correta
 provider "aws" {
-  # IMPORTANTE: Usamos us-east-1 porque o AWS App Runner está disponível lá.
   region = "us-east-1"
 }
 
-# 1. Cria a nossa "garagem" para imagens Docker (ECR)
+# 1. Cria a nossa "garagem" PRIVADA para imagens Docker (ECR)
 resource "aws_ecr_repository" "app_repo" {
   name                 = "s3-uploader-app"
   image_tag_mutability = "MUTABLE"
@@ -56,13 +68,23 @@ resource "aws_apprunner_service" "app_service" {
     image_repository {
       image_identifier      = "${aws_ecr_repository.app_repo.repository_url}:latest"
       image_repository_type = "ECR"
+
+      # ## O LUGAR CORRETO É DENTRO DE UM BLOCO 'image_configuration' ##
+      image_configuration {
+        runtime_environment_variables = {
+          AWS_ACCESS_KEY_ID     = var.app_aws_access_key_id
+          AWS_SECRET_ACCESS_KEY = var.app_aws_secret_access_key
+          AWS_S3_BUCKET_NAME    = "welcome-ecopower"
+          AWS_REGION            = "us-east-1"
+        }
+      }
     }
     auto_deployments_enabled = true
   }
 
   instance_configuration {
-    cpu    = "1024" # 1 vCPU
-    memory = "2048" # 2 GB RAM
+    cpu    = "1024"
+    memory = "2048"
   }
 
   network_configuration {
@@ -77,7 +99,7 @@ resource "aws_apprunner_service" "app_service" {
   }
 }
 
-# Bloco de saídas para exportar informações importantes da nossa infraestrutura
+# Bloco de saídas para exportar informações importantes
 output "ecr_repository_url" {
   description = "A URL do repositório ECR criado."
   value       = aws_ecr_repository.app_repo.repository_url
