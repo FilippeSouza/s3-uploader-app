@@ -7,7 +7,7 @@ resource "aws_ecr_repository" "app_repo" {
   name         = "s3-uploader-app"
   force_delete = true
 }
-/*
+
 # 2. Permissão para o App Runner ACESSAR o ECR
 resource "aws_iam_role" "apprunner_ecr_role" {
   name = "AppRunnerECRAccessRole-s3"
@@ -78,4 +78,4 @@ resource "aws_apprunner_service" "app_service" {
 # Saídas
 output "app_runner_service_arn" {
   value = aws_apprunner_service.app_service.arn
-}*/
+}
