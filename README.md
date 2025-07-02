@@ -28,6 +28,19 @@ Desenvolvi uma solução de automação completa (CI/CD) que permite que qualque
 
 **AWS IAM:** Para gerenciamento fino de permissões entre os serviços.
 
+## 📐 Arquitetura da Solução
+Descrição do Fluxo:
+1. O desenvolvedor envia uma alteração de código para a branch 'main' no GitHub.
+2. O GitHub Actions é acionado automaticamente.
+3. A pipeline constrói a imagem Docker da aplicação Node.js.
+4. A imagem é enviada para o repositório privado no Amazon ECR.
+5. A pipeline comanda o AWS App Runner para iniciar um novo deploy usando a imagem mais recente do ECR.
+6. O App Runner executa a aplicação, que por sua vez tem permissão via IAM Role para fazer uploads no bucket S3.
+
+## 🧠 Desafios e Aprendizados
+
+Um dos maiores desafios foi resolver o problema de dependência ("ovo e da galinha") entre a criação da infraestrutura no Terraform e a necessidade de uma imagem Docker no ECR para o App Runner. A solução foi um processo de bootstrapping em múltiplas etapas, criando primeiro os recursos base (ECR) e depois utilizando a pipeline para popular o ECR antes da criação final do serviço App Runner
+
 
 graph LR
     subgraph "Ambiente de Desenvolvimento"
