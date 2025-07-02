@@ -41,7 +41,6 @@ Descrição do Fluxo:
 
 Um dos maiores desafios foi resolver o problema de dependência ("ovo e da galinha") entre a criação da infraestrutura no Terraform e a necessidade de uma imagem Docker no ECR para o App Runner. A solução foi um processo de bootstrapping em múltiplas etapas, criando primeiro os recursos base (ECR) e depois utilizando a pipeline para popular o ECR antes da criação final do serviço App Runner
 
-
 ```mermaid
 graph LR
     subgraph "Ambiente de Desenvolvimento"
@@ -55,31 +54,30 @@ graph LR
     end
 
     subgraph "Nuvem AWS (Região: us-east-1)"
-        subgraph "Infraestrutura Provisionada via Terraform"
-            ECR[🪝 Amazon ECR]
-            AppRunner[🚀 AWS App Runner]
-            S3[🗄️ Bucket S3<br>welcome-ecopower]
-            IAM[🔑 Roles e Permissões IAM]
-        end
-
+        ECR[🪝 Amazon ECR]
+        AppRunner[🚀 AWS App Runner]
+        S3[🗄️ Bucket S3<br>welcome-ecopower]
+        IAM[🔑 Roles e Permissões IAM]
+        
         App[⚙️ Aplicação Node.js<br>em execução]
     end
 
     U[🧑‍💼 Usuário Final]
 
-    %% Fluxo de Infraestrutura como Código (IaC)
+    %% Fluxos de Trabalho
     A -- "1. terraform apply" --> Tf
-    Tf -- "2. Provisiona" --> Infraestrutura Provisionada
+    Tf -- "Descreve e Cria" --> ECR
+    Tf -- "Descreve e Cria" --> AppRunner
+    Tf -- "Descreve e Cria" --> S3
+    Tf -- "Descreve e Cria" --> IAM
 
-    %% Fluxo de Implantação Contínua (CI/CD)
-    A -- "3. git push" --> B
-    B -- "4. Aciona" --> C
-    C -- "5. Constrói e Envia Imagem Docker" --> ECR
-    C -- "6. Inicia Deploy" --> AppRunner
+    A -- "2. git push" --> B
+    B -- "Aciona Pipeline" --> C
+    C -- "Constrói e Envia Imagem" --> ECR
+    C -- "Inicia Deploy" --> AppRunner
 
-    %% Fluxo da Aplicação em Execução
-    AppRunner -- "7. Puxa a imagem mais recente" --> ECR
-    AppRunner -- "8. Executa" --> App
-    U -- "Acessa a URL pública" --> AppRunner
-    App -- "9. Usa permissões para upload" --> S3
+    AppRunner -- "Puxa Imagem" --> ECR
+    AppRunner -- "Executa" --> App
+    U -- "Acessa URL" --> AppRunner
+    App -- "Usa permissões para upload" --> S3
     AppRunner -- "Utiliza papéis de" --> IAM
