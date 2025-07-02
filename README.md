@@ -27,3 +27,44 @@ Desenvolvi uma solução de automação completa (CI/CD) que permite que qualque
 **AWS App Runner:** Para execução do contêiner da aplicação de forma gerenciada e escalável.
 
 **AWS IAM:** Para gerenciamento fino de permissões entre os serviços.
+
+
+graph LR
+    subgraph "Ambiente de Desenvolvimento"
+        A[👨‍💻 Engenheiro DevOps/Cloud]
+        Tf[📄 Código Terraform]
+    end
+
+    subgraph "Plataforma de Versionamento e CI/CD"
+        B[📦 Repositório GitHub]
+        C[🤖 Pipeline GitHub Actions]
+    end
+
+    subgraph "Nuvem AWS (Região: us-east-1)"
+        subgraph "Infraestrutura Provisionada via Terraform"
+            ECR[🪝 Amazon ECR]
+            AppRunner[🚀 AWS App Runner]
+            S3[🗄️ Bucket S3<br>welcome-ecopower]
+            IAM[🔑 Roles e Permissões IAM]
+        end
+        App[⚙️ Aplicação Node.js<br>em execução]
+    end
+
+    U[🧑‍💼 Usuário Final]
+
+    %% Fluxo de Infraestrutura como Código (IaC)
+    A -- "1. terraform apply" --> Tf
+    Tf -- "2. Provisiona" --> Infraestrutura Provisionada
+
+    %% Fluxo de Implantação Contínua (CI/CD)
+    A -- "3. git push" --> B
+    B -- "4. Aciona" --> C
+    C -- "5. Constrói e Envia Imagem Docker" --> ECR
+    C -- "6. Inicia Deploy" --> AppRunner
+
+    %% Fluxo da Aplicação em Execução
+    AppRunner -- "7. Puxa a imagem mais recente" --> ECR
+    AppRunner -- "8. Executa" --> App
+    U -- "Acessa a URL pública" --> AppRunner
+    App -- "9. Usa permissões para upload" --> S3
+    AppRunner -- "Utiliza papéis de" --> IAM
