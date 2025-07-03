@@ -18,7 +18,7 @@ const upload = multer({
             cb(null, { fieldName: file.fieldname });
         },
         key: function (req, file, cb) {
-            const fileName = `envios_linux/${Date.now().toString()}-${file.originalname}`;
+            const fileName = `global/${Date.now().toString()}-${file.originalname}`;
             cb(null, fileName);
         }
     })
