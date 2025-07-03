@@ -1,3 +1,10 @@
+# Variável para o ID da sua conta AWS
+variable "aws_account_id" {
+  description = "O ID da conta AWS para criar nomes de recursos únicos."
+  type        = string
+}
+
+# Configuração do Provedor AWS
 provider "aws" {
   region = "us-east-1"
 }
@@ -8,7 +15,12 @@ resource "aws_ecr_repository" "app_repo" {
   force_delete = true
 }
 
-# 2. Permissão para o App Runner ACESSAR o ECR
+# 2. NOVO: Bucket S3 para os uploads da APLICAÇÃO
+resource "aws_s3_bucket" "application_data_bucket" {
+  bucket = "s3-uploader-data-${var.aws_account_id}"
+}
+
+# 3. Permissão para o App Runner ACESSAR o ECR
 resource "aws_iam_role" "apprunner_ecr_role" {
   name = "AppRunnerECRAccessRole-s3"
   assume_role_policy = jsonencode({
@@ -25,7 +37,7 @@ resource "aws_iam_role_policy_attachment" "apprunner_ecr_policy_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"
 }
 
-# 3. Permissão para a APLICAÇÃO ACESSAR o S3
+# 4. Permissão para a APLICAÇÃO ACESSAR o NOVO Bucket S3
 resource "aws_iam_role" "apprunner_instance_role" {
   name = "AppRunnerInstanceRole-s3"
   assume_role_policy = jsonencode({
@@ -43,17 +55,18 @@ resource "aws_iam_role_policy" "s3_access_policy" {
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
-      Action   = ["s3:GetObject", "s3:PutObject"],
+      Action   = ["s3:GetObject", "s3:PutObject", "s3:PutObjectAcl"],
       Effect   = "Allow",
+      # CORREÇÃO: Apontando para o novo bucket que criamos
       Resource = [
-        "arn:aws:s3:::welcome-ecopower",
-        "arn:aws:s3:::welcome-ecopower/*",
+        aws_s3_bucket.application_data_bucket.arn,
+        "${aws_s3_bucket.application_data_bucket.arn}/*",
       ]
     }]
   })
 }
 
-# 4. O Serviço App Runner
+# 5. O Serviço App Runner
 resource "aws_apprunner_service" "app_service" {
   service_name = "s3-uploader-service"
 
@@ -64,6 +77,13 @@ resource "aws_apprunner_service" "app_service" {
     image_repository {
       image_identifier      = "${aws_ecr_repository.app_repo.repository_url}:latest"
       image_repository_type = "ECR"
+      # CORREÇÃO: Adicionando as variáveis de ambiente para a aplicação
+      image_configuration {
+        runtime_environment_variables = {
+          AWS_S3_BUCKET_NAME = aws_s3_bucket.application_data_bucket.bucket
+          AWS_REGION         = "us-east-1"
+        }
+      }
     }
     auto_deployments_enabled = true
   }
@@ -71,11 +91,16 @@ resource "aws_apprunner_service" "app_service" {
   instance_configuration {
     cpu               = "1024"
     memory            = "2048"
-    instance_role_arn = aws_iam_role.apprunner_instance_role.arn # Associa a permissão de S3 ao serviço
+    instance_role_arn = aws_iam_role.apprunner_instance_role.arn
   }
 }
 
 # Saídas
 output "app_runner_service_arn" {
   value = aws_apprunner_service.app_service.arn
+}
+
+output "application_s3_bucket_name" {
+  description = "Nome do novo bucket S3 para os dados da aplicação."
+  value       = aws_s3_bucket.application_data_bucket.bucket
 }
