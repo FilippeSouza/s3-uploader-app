@@ -1,30 +1,22 @@
-# Variável para o ID da sua conta AWS
 variable "aws_account_id" {
   description = "O ID da conta AWS para nomes de recursos únicos."
   type        = string
 }
 
-# Configuração do Provedor AWS
 provider "aws" {
   region = "us-east-1"
 }
 
-# ===================================================================
-# Bloco 1: Recursos da Aplicação
-# ===================================================================
-
-# Repositório ECR para a imagem Docker
+# Recursos de Armazenamento
 resource "aws_ecr_repository" "app_repo" {
   name         = "s3-uploader-app"
   force_delete = true
 }
 
-# Bucket S3 para os uploads da aplicação
 resource "aws_s3_bucket" "application_data_bucket" {
   bucket = "s3-uploader-data-${var.aws_account_id}"
 }
 
-# CORREÇÃO: Este é o recurso correto para o object_ownership
 resource "aws_s3_bucket_ownership_controls" "ownership_controls" {
   bucket = aws_s3_bucket.application_data_bucket.id
   rule {
@@ -32,63 +24,6 @@ resource "aws_s3_bucket_ownership_controls" "ownership_controls" {
   }
 }
 
-# Configurações de acesso público para o bucket da aplicação
-resource "aws_s3_bucket_public_access_block" "public_access_block" {
-  bucket                  = aws_s3_bucket.application_data_bucket.id
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
-
-resource "aws_s3_bucket_acl" "bucket_acl" {
-  depends_on = [
-    aws_s3_bucket_ownership_controls.ownership_controls,
-    aws_s3_bucket_public_access_block.public_access_block
-  ]
-  bucket = aws_s3_bucket.application_data_bucket.id
-  acl    = "private"
-}
-
-
-# Permissões do IAM e Serviço App Runner... (coloque o resto do seu código aqui)
-# ... (Os blocos de IAM Role e App Runner que já tínhamos) ...
-
-
-
-
-/*
-# Variável para o ID da sua conta AWS
-variable "aws_account_id" {
-  description = "O ID da conta AWS para nomes de recursos únicos."
-  type        = string
-}
-
-# Configuração do Provedor AWS
-provider "aws" {
-  region = "us-east-1"
-}
-
-# 1. Cria o repositório ECR
-resource "aws_ecr_repository" "app_repo" {
-  name         = "s3-uploader-app"
-  force_delete = true
-}
-
-# 2. Cria o Bucket S3 para os uploads da APLICAÇÃO
-resource "aws_s3_bucket" "application_data_bucket" {
-  bucket = "s3-uploader-data-${var.aws_account_id}"
-}
-
-# CORREÇÃO: Este é o recurso correto para o object_ownership
-resource "aws_s3_bucket_ownership_controls" "ownership_controls" {
-  bucket = aws_s3_bucket.application_data_bucket.id
-  rule {
-    object_ownership = "ObjectWriter"
-  }
-}
-
-# Configurações de acesso público para o bucket da aplicação
 resource "aws_s3_bucket_public_access_block" "public_access_block" {
   bucket                  = aws_s3_bucket.application_data_bucket.id
   block_public_acls       = false
@@ -106,8 +41,7 @@ resource "aws_s3_bucket_acl" "bucket_acl" {
   acl    = "private"
 }
 /*
-
-# 3. Permissões do IAM para o App Runner
+# Permissões do IAM
 resource "aws_iam_role" "apprunner_ecr_role" {
   name               = "AppRunnerECRAccessRole-s3-uploader"
   assume_role_policy = jsonencode({
@@ -132,10 +66,9 @@ resource "aws_iam_role_policy_attachment" "s3_full_access_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
 }
 
-# 4. Serviço App Runner
+# Serviço App Runner
 resource "aws_apprunner_service" "app_service" {
   service_name = "s3-uploader-service"
-
   source_configuration {
     authentication_configuration {
       access_role_arn = aws_iam_role.apprunner_ecr_role.arn
@@ -153,7 +86,6 @@ resource "aws_apprunner_service" "app_service" {
     }
     auto_deployments_enabled = true
   }
-
   instance_configuration {
     cpu               = "1024"
     memory            = "2048"
@@ -161,7 +93,7 @@ resource "aws_apprunner_service" "app_service" {
   }
 }
 
-# 5. Saídas
+# Saídas
 output "app_runner_service_arn" {
   description = "O ARN do serviço App Runner criado."
   value       = aws_apprunner_service.app_service.arn
