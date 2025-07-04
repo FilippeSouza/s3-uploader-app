@@ -42,5 +42,13 @@ jobs:
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Start App Runner deployment
-        run: aws apprunner start-deployment --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}"
+      - name: Start App Runner deployment if service is running
+        run: |
+          SERVICE_STATUS=$(aws apprunner describe-service --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" --query 'Service.Status' --output text || echo "NOT_FOUND")
+          echo "O status atual do serviço é: $SERVICE_STATUS"
+          if [ "$SERVICE_STATUS" == "RUNNING" ]; then
+            echo "Serviço está RUNNING. Iniciando novo deploy..."
+            aws apprunner start-deployment --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}"
+          else
+            echo "Serviço não está no estado RUNNING (Status: $SERVICE_STATUS). Pulando o trigger de deploy. Isso é esperado na criação inicial."
+          fi
