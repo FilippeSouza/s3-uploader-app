@@ -3,17 +3,14 @@ const multer = require('multer');
 const { S3Client } = require('@aws-sdk/client-s3');
 const multerS3 = require('multer-s3');
 
-// 1. Configurar o Cliente S3 - Versão para Nuvem
-// Ele não precisa de nenhuma configuração. O SDK da AWS encontrará
-// as permissões automaticamente através do IAM Role do App Runner.
+// 1. Configura o Cliente S3 para usar as permissões do ambiente (IAM Role)
 const s3Client = new S3Client({});
 
-// 2. Configurar o Multer para fazer o upload para o S3
+// 2. Configura o Multer para fazer o upload PRIVADO para o S3
 const upload = multer({
     storage: multerS3({
         s3: s3Client,
-        bucket: process.env.AWS_S3_BUCKET_NAME, // Usando o nome do bucket diretamente
-        acl: 'public-read',
+        bucket: process.env.AWS_S3_BUCKET_NAME, // Lendo da variável de ambiente
         metadata: function (req, file, cb) {
             cb(null, { fieldName: file.fieldname });
         },
@@ -24,10 +21,8 @@ const upload = multer({
     })
 });
 
-// 3. Inicializar a aplicação Express
+// 3. Inicializa a aplicação Express
 const app = express();
-// O App Runner nos informa em qual porta ele quer que a aplicação rode.
-// Devemos usar a variável de ambiente PORT que ele fornece.
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static('public'));
@@ -36,14 +31,15 @@ app.post('/upload', upload.single('file'), (req, res) => {
     if (!req.file) {
         return res.status(400).send('Nenhum arquivo foi enviado.');
     }
-    console.log('Arquivo enviado com sucesso:', req.file);
+    console.log('Arquivo enviado com sucesso (privado):', req.file.key);
+    // Retornamos a chave do objeto, já que a URL não será pública
     res.status(200).json({ 
         message: 'Arquivo enviado com sucesso!',
-        url: req.file.location 
+        fileKey: req.file.key 
     });
 });
 
-// 4. Iniciar o servidor
+// 4. Inicia o servidor
 app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(`Servidor rodando e escutando na porta ${PORT}`);
 });
