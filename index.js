@@ -15,7 +15,7 @@ const upload = multer({
             cb(null, { fieldName: file.fieldname });
         },
         key: function (req, file, cb) {
-            const fileName = `global/${Date.now().toString()}-${file.originalname}`;
+            const fileName = `repositorio/${Date.now().toString()}-${file.originalname}`;
             cb(null, fileName);
         }
     })
