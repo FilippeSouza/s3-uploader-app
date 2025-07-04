@@ -40,7 +40,7 @@ resource "aws_s3_bucket_acl" "bucket_acl" {
   bucket = aws_s3_bucket.application_data_bucket.id
   acl    = "private"
 }
-/*
+
 # Permissões do IAM
 resource "aws_iam_role" "apprunner_ecr_role" {
   name               = "AppRunnerECRAccessRole-s3-uploader"
@@ -98,4 +98,3 @@ output "app_runner_service_arn" {
   description = "O ARN do serviço App Runner criado."
   value       = aws_apprunner_service.app_service.arn
 }
-*/
